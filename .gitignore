@@ -6,6 +6,10 @@ dist/
 .env
 .env.local
 
+# Build / deploy artifacts that should never be committed
+*.zip
+netlify_deploy_result.png
+
 # Editor / OS noise
 .DS_Store
 Thumbs.db

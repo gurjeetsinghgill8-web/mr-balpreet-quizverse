@@ -432,6 +432,54 @@ export function createApi({ store, secret, version = '1.0.0', rateLimit = true }
       done(res, { results: rows.slice(0, 500) });
     }],
 
+    /**
+     * Sync path: a game played fully offline on a student device is uploaded
+     * here once the teacher is online. Idempotent on play_id (one play = one row).
+     */
+    ['POST', /^\/api\/results$/, async (req, res) => {
+      const teacher = await requireTeacher(req, res);
+      if (!teacher) return;
+      const body = await readBody(req);
+      const quiz = await ownedQuiz(teacher, body.quiz_id, res);
+      if (!quiz) return;
+      const result = body.result;
+      if (!result || typeof result !== 'object') { fail(res, 400, 'invalid_result', 'A game result is required.'); return; }
+
+      const playId = String(result.play_id || `p_${randomUUID()}`);
+      const existing = (await store.results.list(quiz.quiz_id)).find((r) => r.play_id === playId);
+      if (existing) {
+        done(res, { result: { play_id: existing.play_id, quiz_id: existing.quiz_id, status: existing.status, score: existing.score }, idempotent: true });
+        return;
+      }
+
+      const row = {
+        play_id: playId,
+        session_id: String(result.session_id || playId),
+        quiz_id: quiz.quiz_id,
+        teacher_id: teacher.teacher_id,
+        student_name: String(result.student_name || 'Champion').slice(0, 20),
+        class_level: Number(result.class_level) || null,
+        topic: String(result.topic || quiz.topic || '').slice(0, 160),
+        mode: 'individual',
+        score: Math.max(0, Number(result.score) || 0),
+        max_score: Math.max(0, Number(result.max_score) || 0),
+        accuracy: Math.max(0, Math.min(100, Number(result.accuracy) || 0)),
+        correct: Math.max(0, Number(result.correct) || 0),
+        incorrect: Math.max(0, Number(result.incorrect) || 0),
+        stage_reached: Math.max(0, Math.min(5, Number(result.stage_reached) || 0)),
+        stages_cleared: Math.max(0, Math.min(5, Number(result.stages_cleared) || 0)),
+        status: ['WINNER', 'NOT_CLEARED', 'ABORTED'].includes(result.status) ? result.status : 'ABORTED',
+        lifelines_used: Array.isArray(result.lifelines_used) ? result.lifelines_used.slice(0, 8) : [],
+        per_question: Array.isArray(result.per_question) ? result.per_question.slice(0, 60) : [],
+        per_stage: Array.isArray(result.per_stage) ? result.per_stage.slice(0, 8) : [],
+        time_taken_seconds: Math.max(0, Number(result.time_taken_seconds) || 0),
+        started_at: result.started_at || null,
+        completed_at: result.completed_at || new Date().toISOString(),
+      };
+      await store.results.create(row);
+      done(res, { result: { play_id: row.play_id, quiz_id: row.quiz_id, status: row.status, score: row.score } });
+    }],
+
     ['GET', /^\/api\/analytics$/, async (req, res, url) => {
       const teacher = await requireTeacher(req, res);
       if (!teacher) return;

@@ -12,6 +12,7 @@ import { Sound } from '../audio.js';
 import { createGame } from '../../packages/game-engine/engine.js';
 import { illustrationSVG } from '../illustrations.js';
 import { quizoSVG, mascotLine as pickMascotLine } from '../mascot.js';
+import { certificateModel, certificateHTML } from '../certificate.js';
 
 /* ------------------------------------------------------------------ */
 /* session state                                                       */
@@ -25,11 +26,15 @@ export function setStudent(name) { if (S) S.student = name; }
 export function startSession(ctx, pkg, student = '') {
   const tier = tierFor(pkg.class_level);
   document.getElementById('qv-root').setAttribute('data-tier', tier);
+  const name = student || t('name.placeholder');
+  // The engine reads student_name straight off the package; give it a copy so the
+  // shared package is not mutated and the result records the real child's name.
+  const playPkg = { ...pkg, student_name: name };
   S = {
-    pkg,
-    student: student || t('name.placeholder'),
+    pkg: playPkg,
+    student: name,
     tier,
-    engine: createGame(pkg),
+    engine: createGame(playPkg),
     suspended: false,
     timerId: null,
     suspenseId: null,
@@ -719,6 +724,7 @@ export function resultScreen(ctx) {
           <button class="qv-btn qv-btn--primary qv-btn--lg" id="qv-play-again">🔁 ${esc(t('win.playAgain'))}</button>
           <button class="qv-btn" id="qv-new-game">${esc(t('win.newGame'))}</button>
           <button class="qv-btn qv-btn--ghost" id="qv-review">${esc(t('win.review'))}</button>
+          <button class="qv-btn qv-btn--violet" id="qv-certificate">🏅 ${esc(t('result.certificate'))}</button>
           <button class="qv-btn qv-btn--ghost" id="qv-dash">${esc(t('result.dashboard'))}</button>
         </div>
         <div class="qv-mascot-wrap">
@@ -739,6 +745,31 @@ export function resultScreen(ctx) {
   $('#qv-new-game', ctx.root).onclick = () => { Sound.play('button'); ctx.go('create'); };
   $('#qv-review', ctx.root).onclick = () => { Sound.play('button'); ctx.go('review'); };
   $('#qv-dash', ctx.root).onclick = () => { Sound.play('button'); ctx.go('dashboard'); };
+  $('#qv-certificate', ctx.root).onclick = () => {
+    Sound.play('button');
+    const cloud = Store.settings().cloudTeacher || {};
+    const language = (ctx.state.pkg && ctx.state.pkg.language) || 'en';
+    const model = certificateModel(r, {
+      school_name: cloud.school_name || '',
+      teacher_name: cloud.name || '',
+      locale: language === 'hi' ? 'hi' : 'en',
+    });
+    const overlay = document.getElementById('qv-overlay');
+    overlay.innerHTML = `
+      <div class="qv-card" style="max-width:1160px;width:96vw;max-height:94vh;overflow:auto">
+        <div class="qv-row qv-row--between">
+          <h2 class="qv-h3">🏅 ${esc(t('result.certificate'))}</h2>
+          <div class="qv-row">
+            <button class="qv-btn qv-btn--primary qv-btn--sm" id="qv-print">🖨 ${esc(t('result.print'))}</button>
+            <button class="qv-btn qv-btn--sm" id="qv-cert-close">${esc(t('common.close'))}</button>
+          </div>
+        </div>
+        <div style="margin-top:12px">${certificateHTML(model)}</div>
+      </div>`;
+    overlay.hidden = false;
+    $('#qv-print', overlay).onclick = () => window.print();
+    $('#qv-cert-close', overlay).onclick = () => { overlay.hidden = true; overlay.innerHTML = ''; };
+  };
   return null;
 }
 

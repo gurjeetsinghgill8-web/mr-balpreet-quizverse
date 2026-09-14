@@ -216,6 +216,10 @@ const cleanup = () => {
     check('sound settings are persisted per device',
       audioState && typeof audioState.sound === 'boolean' && typeof audioState.volume === 'number',
       JSON.stringify(audioState));
+    check('music is ON by default for the game-show feel',
+      audioState && audioState.music === true, JSON.stringify(audioState));
+    check('the volume defaults to full loudness',
+      audioState && audioState.volume >= 0.9, `volume=${audioState && audioState.volume}`);
 
     const played = await evaluate(`(() => {
       try {
@@ -395,7 +399,22 @@ const cleanup = () => {
     check('winner screen celebrates on the result route',
       await evaluate('document.getElementById("qv-root").dataset.screen') === 'result');
     check('winner screen shows the trophy and name', /🏆/.test(resultText) && resultText.includes('Aarav'));
+    check('the winner title uses the real student name, not the fallback',
+      /Aarav/.test(await evaluate('document.querySelector(".qv-winner-name").textContent'))
+      && !/Champion/.test(await evaluate('document.querySelector(".qv-winner-name").textContent')));
     check('result shows accuracy and stage stats', /Accuracy/i.test(resultText) && /Stage/i.test(resultText));
+
+    await evaluate('document.querySelector("#qv-certificate").click()');
+    await sleep(500);
+    check('the printable certificate opens with original SVG art',
+      await evaluate('!!document.querySelector("#qv-overlay .qv-cert") === true'));
+    check('the certificate names the student and topic',
+      await evaluate('(() => { const c = document.querySelector("#qv-overlay .qv-cert"); return c ? (c.dataset.student + "|" + c.dataset.topic) : "no-svg"; })()') === 'Aarav|Solar System',
+      await evaluate('(() => { const c = document.querySelector("#qv-overlay .qv-cert"); return c ? c.dataset.student + "|" + c.dataset.topic : "no-svg"; })()'));
+    check('the certificate has a print button',
+      await evaluate('!!document.querySelector("#qv-print") === true'));
+    await evaluate('document.querySelector("#qv-cert-close").click()');
+    await sleep(200);
 
     const savedResult = await evaluate('window.QUIZVERSE.Store.results().length');
     check('result is persisted in the local store', Number(savedResult) >= 1, `results=${savedResult}`);
@@ -578,6 +597,14 @@ const cleanup = () => {
 
     /* ---------------- 11. mobile viewport ---------------- */
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+    await send('Page.navigate', { url: `${BASE}/#/account` });
+    await waitFor('document.querySelector("#qv-email")', { label: 'account screen' });
+    check('the account screen opens with sign-in fields',
+      await evaluate('document.getElementById("qv-root").dataset.screen') === 'account'
+      && await evaluate('!!document.querySelector("#qv-password")'));
+    check('the account screen is mobile friendly (no overflow)',
+      await evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth') <= 1);
+
     await send('Page.navigate', { url: `${BASE}/#/landing` });
     await sleep(1200);
     const overflow = await evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth');

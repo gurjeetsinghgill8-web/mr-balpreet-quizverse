@@ -11,6 +11,7 @@ import { Sound } from './audio.js';
 import { esc, $, $$, toast, tierFor, fullscreenToggle, prefersReducedMotion } from './ui.js';
 import * as teacher from './screens/teacher.js';
 import * as game from './screens/game.js';
+import * as account from './screens/account.js';
 
 const root = document.getElementById('qv-root');
 
@@ -45,6 +46,7 @@ function header({ compact = false } = {}) {
     <div class="qv-spacer"></div>
     ${compact ? '' : `
       <button class="qv-btn qv-btn--sm qv-btn--ghost" data-action="go-dashboard">📊 ${esc(t('dash.title'))}</button>
+      <button class="qv-btn qv-btn--sm qv-btn--ghost" data-action="go-account" title="${esc(t('account.title'))}">👤</button>
       <button class="qv-btn qv-btn--sm qv-btn--ghost" data-action="go-settings" title="${esc(t('settings.title'))}">⚙</button>
       <button class="qv-btn qv-btn--sm qv-btn--primary" data-action="go-create">🎮 ${esc(t('landing.create'))}</button>`}
     <button class="qv-icon-btn" data-action="lang" title="${esc(t('common.language'))}" aria-label="${esc(t('common.language'))}">${lang === 'en' ? 'हिं' : 'EN'}</button>
@@ -65,6 +67,7 @@ const routes = {
   create: teacher.create,
   loading: teacher.loading,
   settings: teacher.settings,
+  account: account.account,
   preview: teacher.preview,
   dashboard: teacher.dashboard,
   name: game.nameScreen,
@@ -142,6 +145,7 @@ document.addEventListener('click', (event) => {
     case 'go-landing': Sound.play('button'); go('landing'); break;
     case 'go-create': Sound.play('button'); go('create'); break;
     case 'go-settings': Sound.play('button'); go('settings'); break;
+    case 'go-account': Sound.play('button'); go('account'); break;
     case 'go-dashboard': Sound.play('button'); go('dashboard'); break;
     case 'fullscreen': Sound.play('button'); fullscreenToggle(); break;
     case 'lang': {
@@ -197,13 +201,25 @@ function boot() {
   });
 
   // Browsers only allow audio after a real gesture (§11.2).
+  const soundBanner = document.getElementById('qv-sound-banner');
+  const updateSoundBanner = () => {
+    if (!soundBanner) return;
+    soundBanner.hidden = Sound.unlocked || !Store.settings().sound;
+  };
   const unlock = () => {
     Sound.unlock();
     Sound.apply({});
     if (Store.settings().music) Sound.startMusic();
+    updateSoundBanner();
   };
   document.addEventListener('pointerdown', unlock, { once: true });
   document.addEventListener('keydown', unlock, { once: true });
+  if (soundBanner) {
+    soundBanner.addEventListener('click', () => { unlock(); Sound.play('intro'); });
+    updateSoundBanner();
+    // keep it accurate as routes change / settings change
+    window.addEventListener('hashchange', () => setTimeout(updateSoundBanner, 200));
+  }
 
   window.addEventListener('hashchange', onHashChange);
 

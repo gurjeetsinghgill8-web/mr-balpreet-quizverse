@@ -748,7 +748,14 @@ export function settings(ctx) {
   serverAiStatus().then((status) => {
     const badge = $('#qv-server-status', ctx.root);
     if (!badge) return;
-    if (!status) { badge.textContent = `${t('settings.serverKey')}: ${t('settings.serverKeyNo')}`; return; }
+    if (!status) {
+      // No API = a static host (Netlify / GitHub Pages). Live AI cannot work here.
+      badge.textContent = 'static host — live AI needs the Node server';
+      badge.className = 'qv-chip qv-small qv-chip--coral';
+      const note = $('#qv-provider-note', ctx.root);
+      if (note) note.textContent = t('settings.viewerNote');
+      return;
+    }
     badge.textContent = `${t('settings.serverKey')}: ${status.serverKeyConfigured ? t('settings.serverKeyYes') : t('settings.serverKeyNo')} · default ${status.serverProvider}`;
     badge.className = `qv-chip qv-small ${status.serverKeyConfigured ? 'qv-chip--green' : ''}`;
   });

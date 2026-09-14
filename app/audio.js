@@ -21,7 +21,7 @@
  *   lifeline     → magical sweep
  */
 
-const DEFAULTS = { sound: true, music: false, effects: true, volume: 0.9 };
+const DEFAULTS = { sound: true, music: true, effects: true, volume: 1.0 };
 
 let settings = { ...DEFAULTS };
 let ctx = null;
@@ -68,7 +68,7 @@ function ensureCtx() {
   fxBus.connect(master);
 
   musicBus = ctx.createGain();
-  musicBus.gain.value = settings.music ? 0.45 : 0;
+  musicBus.gain.value = settings.music ? 0.6 : 0;
   musicBus.connect(master);
 
   return ctx;
@@ -306,8 +306,10 @@ const MUSIC_CHORDS = [
 function musicStep() {
   if (!ctx || !settings.music || !settings.sound) return;
   const chord = MUSIC_CHORDS[Math.floor((Date.now() / 2400) % MUSIC_CHORDS.length)];
-  tone({ freq: chord[Math.floor(Math.random() * chord.length)] * 2, dur: 0.5, type: 'triangle', gain: 0.06, bus: 'music' });
-  if (Math.random() < 0.5) tone({ freq: chord[0], dur: 0.9, type: 'sine', gain: 0.05, bus: 'music', delay: 0.12 });
+  // bass + mid arp + a soft pad so the "music" is clearly audible, not just a blip
+  tone({ freq: chord[0] / 2, dur: 1.6, type: 'sine', gain: 0.13, bus: 'music' });
+  tone({ freq: chord[Math.floor(Math.random() * chord.length)] * 2, dur: 0.55, type: 'triangle', gain: 0.09, bus: 'music' });
+  tone({ freq: chord[Math.floor(Math.random() * chord.length)] * 3, dur: 0.4, type: 'sine', gain: 0.06, bus: 'music', delay: 0.3 });
 }
 
 /* ------------------------------------------------------------------ */
@@ -320,6 +322,8 @@ export const Sound = {
     if (!ensureCtx()) return false;
     if (ctx.state === 'suspended') ctx.resume();
     unlocked = true;
+    // Once the browser lets us make sound, the show's music bed starts too.
+    if (settings.music) Sound.startMusic();
     return true;
   },
   get unlocked() { return unlocked; },

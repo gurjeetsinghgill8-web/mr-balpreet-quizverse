@@ -11,9 +11,9 @@ const KEY = 'quizverse.v1';
 const DEFAULT_SETTINGS = {
   uiLang: 'en',
   sound: true,
-  music: false,
+  music: true,
   effects: true,
-  volume: 0.9,
+  volume: 1.0,
   mascot: true,
   reducedMotion: false,
   /* Layer 1 engine selection (§8.8). The key is device-local only. */
@@ -24,6 +24,10 @@ const DEFAULT_SETTINGS = {
   aiFallback: true,
   aiTimeoutMs: 60000,
   aiTemperature: 0.6,
+  /* Cloud account (§17): empty until the teacher signs in. */
+  cloudToken: '',
+  cloudTeacher: null,
+  cloudUrl: '',
 };
 
 let db = { settings: { ...DEFAULT_SETTINGS }, quizzes: [], results: [], draft: null };
@@ -192,11 +196,30 @@ export const Store = {
       topic: result.topic || quizMeta.topic || '',
       subject: quizMeta.subject || '',
       completed_at: new Date().toISOString(),
+      synced: false, // uploaded to the teacher's account only after sync()
     };
     db.results.unshift(row);
     if (db.results.length > 500) db.results.length = 500;
     persist();
     return row;
+  },
+
+  /** Rows that have not reached the cloud yet (the sync queue). */
+  unsyncedResults() {
+    return db.results.filter((r) => !r.synced).slice(0, 200);
+  },
+
+  markResultSynced(playId) {
+    const row = db.results.find((r) => r.play_id === playId);
+    if (row) { row.synced = true; persist(); }
+    return row || null;
+  },
+
+  /** Remember that this quiz now also exists on the teacher's account. */
+  markQuizSynced(quizId, remoteUpdatedAt) {
+    const entry = db.quizzes.find((q) => q.quiz_id === quizId);
+    if (entry) { entry.synced_at = remoteUpdatedAt || new Date().toISOString(); persist(); }
+    return entry || null;
   },
 
   results(quizId) {
@@ -205,6 +228,17 @@ export const Store = {
 
   clearResults(quizId) {
     db.results = quizId ? db.results.filter((r) => r.quiz_id !== quizId) : [];
+    persist();
+  },
+
+  /**
+   * Wipe local quizzes, results and the form draft (settings and the signed-in
+   * account stay). Also the privacy control: clear a shared device between students.
+   */
+  clearAll() {
+    db.quizzes = [];
+    db.results = [];
+    db.draft = null;
     persist();
   },
 

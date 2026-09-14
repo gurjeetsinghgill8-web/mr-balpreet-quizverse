@@ -571,6 +571,18 @@ h1, h2, h3, h4 { font-family: var(--qv-font-display); line-height: 1.12; margin:
 }
 .qv-overlay[hidden] { display: none; }
 
+/* "Tap to enable sound" — browsers block audio until a gesture, so make it obvious. */
+.qv-sound-banner {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 80;
+  padding: 12px 22px; border-radius: var(--qv-r-pill); cursor: pointer;
+  background: linear-gradient(160deg, var(--qv-gold-300), var(--qv-gold-400));
+  color: #2A1A00; font-weight: 800; font-size: 15px; border: none;
+  box-shadow: var(--qv-glow-gold), var(--qv-shadow-2);
+  animation: qv-banner-in var(--qv-base) var(--qv-ease-spring) both;
+}
+@keyframes qv-banner-in { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.qv-sound-banner[hidden] { display: none; }
+
 /* ---------- 19. RESPONSIVE ---------- */
 @media (max-width: 1024px) {
   .qv-hero { grid-template-columns: 1fr; }

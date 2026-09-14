@@ -338,6 +338,40 @@ test('a result cannot be submitted with the wrong session token', async () => {
   assert.equal(unknown.status, 404);
 });
 
+test('offline results sync straight to the account and stay idempotent', async () => {
+  const { token } = await newTeacher('p2');
+  const created = await api('/api/quizzes', { method: 'POST', token, body: { package: packageFor() } });
+  const quizId = created.payload.quiz.quiz_id;
+
+  const playId = `p_${Math.random().toString(36).slice(2, 10)}`;
+  const result = { ...finishedResult('Offline Child'), play_id: playId };
+
+  const first = await api('/api/results', { method: 'POST', token, body: { quiz_id: quizId, result } });
+  assert.equal(first.status, 200);
+  assert.equal(first.payload.result.play_id, playId);
+
+  const retry = await api('/api/results', { method: 'POST', token, body: { quiz_id: quizId, result } });
+  assert.equal(retry.payload.idempotent, true, 'an offline retry must not double-count the play');
+
+  const results = await api(`/api/results?quiz_id=${quizId}`, { token });
+  assert.equal(results.payload.results.length, 1);
+
+  // analytics for that teacher reflect the synced play
+  const analytics = await api(`/api/analytics?quiz_id=${quizId}`, { token });
+  assert.equal(analytics.payload.analytics.plays, 1);
+});
+
+test('a teacher cannot sync a result onto someone else quiz', async () => {
+  const owner = await newTeacher('p3');
+  const stranger = await newTeacher('p4');
+  const created = await api('/api/quizzes', { method: 'POST', token: owner.token, body: { package: packageFor() } });
+
+  const res = await api('/api/results', {
+    method: 'POST', token: stranger.token, body: { quiz_id: created.payload.quiz.quiz_id, result: finishedResult() },
+  });
+  assert.equal(res.status, 403);
+});
+
 test('analytics aggregate plays, scores, the most missed question and weak concepts', async () => {
   const { token } = await newTeacher('p');
   const created = await api('/api/quizzes', { method: 'POST', token, body: { package: packageFor() } });
