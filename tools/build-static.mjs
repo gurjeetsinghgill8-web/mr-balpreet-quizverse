@@ -14,7 +14,7 @@
  *   node tools/build-static.mjs
  */
 
-import { cp, mkdir, rm, readdir, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, rm, readdir, stat, writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,6 +39,28 @@ async function main() {
   await mkdir(path.join(DIST, 'packages'), { recursive: true });
   await cp(path.join(ROOT, 'packages', 'game-engine'), path.join(DIST, 'packages', 'game-engine'), { recursive: true });
   await cp(path.join(ROOT, 'packages', 'ai-service'), path.join(DIST, 'packages', 'ai-service'), { recursive: true });
+
+  // Fix relative imports in dist so they don't break on subpath hosts like GitHub Pages
+  const fixImports = async (dir, isSubdir = false) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory() && entry.name !== 'packages') {
+        await fixImports(full, true);
+      } else if (entry.isFile() && entry.name.endsWith('.js')) {
+        const content = await readFile(full, 'utf8');
+        let patched = content;
+        if (isSubdir) {
+          patched = patched.replace(/(['"])\.\.\/\.\.\/packages\//g, '$1../packages/');
+        } else {
+          patched = patched.replace(/(['"])\.\.\/packages\//g, '$1./packages/');
+        }
+        if (patched !== content) {
+          await writeFile(full, patched, 'utf8');
+        }
+      }
+    }
+  };
+  await fixImports(DIST, false);
 
   // A tiny marker so an operator can confirm which build is live.
   await writeFile(
