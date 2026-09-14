@@ -1,0 +1,21 @@
+{
+  "name": "quizverse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QUIZVERSE — AI classroom game show. Class + Topic in, complete 5-stage educational game out.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "start:lan": "node server.mjs --lan",
+    "build:static": "node tools/build-static.mjs",
+    "test": "node --test tests/engine.test.mjs tests/validator.test.mjs tests/generator.test.mjs tests/ai-provider.test.mjs tests/ingest.test.mjs tests/quiz-editor.test.mjs tests/api.test.mjs tests/ui-modules.test.mjs",
+    "qa:browser": "node tools/smoke.mjs",
+    "qa:design": "node tools/design-qa.mjs",
+    "shots": "node tools/shots.mjs",
+    "check": "npm run test && npm run qa:browser && npm run qa:design"
+  }
+}

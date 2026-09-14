@@ -1,0 +1,16 @@
+# Runtime data: teacher accounts, quizzes, results, materials. Never commit.
+.data/
+dist/
+
+# Secrets
+.env
+.env.local
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+
+# Optional: keep the review screenshots out of the repository
+# shots/

@@ -1,0 +1,29 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 760 >>
+stream
+BT /F1 12 Tf 72 720 Td (Photosynthesis is the process by which green plants make food using sunlight.) Tj ET
+BT /F1 12 Tf 72 700 Td (Chlorophyll is the green pigment in leaves that absorbs sunlight.) Tj ET
+BT /F1 12 Tf 72 680 Td (Stomata are tiny pores on a leaf that let gases move in and out.) Tj ET
+BT /F1 12 Tf 72 660 Td (The stem carries water from the roots to the leaves.) Tj ET
+BT /F1 12 Tf 72 640 Td (Roots are the part of a plant that absorb water from the soil.) Tj ET
+BT /F1 12 Tf 72 620 Td (A seedling is a young plant that grows from a seed.) Tj ET
+BT /F1 12 Tf 72 600 Td (Evaporation is the change of water into vapour when it is heated.) Tj ET
+BT /F1 12 Tf 72 580 Td (Condensation is the change of vapour back into liquid water.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+trailer
+<< /Root 1 0 R /Size 6 >>
+%%EOF

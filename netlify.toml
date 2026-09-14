@@ -1,0 +1,29 @@
+# Netlify / Cloudflare Pages — static build of the game (no server needed).
+#
+#   npm run build:static      → creates ./dist
+#   Netlify Drop: drag ./dist onto https://app.netlify.com/drop
+#
+# This build plays fully offline: quizzes, sounds graphics all work, results are
+# stored in the browser. Teacher accounts, cloud sync, PDF-free AI-proxy calls
+# and server-side analytics need the Node server (see DEPLOY.md option 2).
+
+[build]
+  command = "node tools/build-static.mjs"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "same-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/build-info.json"
+  [headers.values]
+    Cache-Control = "no-store"

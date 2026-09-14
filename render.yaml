@@ -1,0 +1,36 @@
+# QUIZVERSE on Render — free tier friendly (one web service).
+#
+# 1. Push this repository to GitHub.
+# 2. render.com → New → Blueprint → pick the repo (this file is detected).
+# 3. Set QV_API_SECRET in the dashboard (keeps teacher logins valid across restarts).
+# 4. Optional: add QV_DATABASE_URL (free Neon/Supabase Postgres) so quizzes and
+#    results survive redeploys, and QV_AI_KEY to switch on live AI generation.
+
+services:
+  - type: web
+    name: quizverse
+    runtime: node
+    plan: free
+    buildCommand: "node -e \"console.log('no build step needed')\""
+    startCommand: "node server.mjs"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: QV_API_SECRET
+        generateValue: true      # Render creates a strong secret for you
+      - key: QV_STORAGE
+        value: file
+      - key: QV_DATA_DIR
+        value: /var/data
+      # - key: QV_DATABASE_URL     # recommended: free Postgres for permanent data
+      #   sync: false
+      # - key: QV_AI_PROVIDER
+      #   value: openai
+      # - key: QV_AI_KEY
+      #   sync: false
+    disk:
+      name: quizverse-data
+      mountPath: /var/data
+      sizeGB: 1
