@@ -157,6 +157,15 @@ All art, sound and motion must stay original, licensed or CC0, and registered in
 | Document | Purpose |
 |---|---|
 | [`PRODUCT_DEVELOPMENT.md`](./PRODUCT_DEVELOPMENT.md) | Master Product Development File: vision, screen-by-screen spec, game rules, AI pipeline, design system, data model, API, acceptance tests, AI prompt templates, sample packs, UI strings, DoD |
+| [`DEPLOY.md`](./DEPLOY.md) | Quick deployment guide: all four options (static, Node, LAN, VPS) |
+| [`docs/`](./docs/README.md) | Full documentation hub: architecture, runbooks, ADRs |
+| [`docs/architecture/overview.md`](./docs/architecture/overview.md) | System design, three-layer architecture, data flow, file map |
+| [`docs/runbooks/RB-001`](./docs/runbooks/RB-001-deploy-static.md) | Deploy static site (GitHub Pages / Netlify / Cloudflare) |
+| [`docs/runbooks/RB-002`](./docs/runbooks/RB-002-deploy-node.md) | Deploy full Node server (Render / Docker / VPS) |
+| [`docs/runbooks/RB-003`](./docs/runbooks/RB-003-classroom-lan.md) | Offline classroom LAN mode |
+| [`docs/runbooks/RB-004`](./docs/runbooks/RB-004-incident-response.md) | Incident response: what to do when things break |
+| [`docs/runbooks/RB-005`](./docs/runbooks/RB-005-adding-quiz-packs.md) | Add new curated offline quiz packs |
+| [`docs/adr/ADR-001`](./docs/adr/ADR-001-static-first.md) | Why the static-first, no-bundler design was chosen |
 
 ## 🧪 Non-negotiable quality bar
 
