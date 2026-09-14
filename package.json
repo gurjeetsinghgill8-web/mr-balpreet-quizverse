@@ -15,7 +15,8 @@
     "test": "node --test tests/engine.test.mjs tests/validator.test.mjs tests/generator.test.mjs tests/ai-provider.test.mjs tests/ingest.test.mjs tests/quiz-editor.test.mjs tests/api.test.mjs tests/certificate.test.mjs tests/cloud.test.mjs tests/ui-modules.test.mjs",
     "qa:browser": "node tools/smoke.mjs",
     "qa:design": "node tools/design-qa.mjs",
+    "qa:sound": "node tools/sound-meter.mjs",
     "shots": "node tools/shots.mjs",
-    "check": "npm run test && npm run qa:browser && npm run qa:design"
+    "check": "npm run test && npm run qa:browser && npm run qa:design && npm run qa:sound"
   }
 }

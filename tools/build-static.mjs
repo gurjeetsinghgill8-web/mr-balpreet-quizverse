@@ -62,12 +62,23 @@ async function main() {
   };
   await fixImports(DIST, false);
 
+  // Cache-busting: hosts (GitHub Pages, Netlify) cache JS/CSS aggressively, and a
+  // stale audio.js means a stale-sounding game. A per-build query string forces a
+  // fresh download without renaming files.
+  const stamp = Date.now().toString(36);
+  const indexPath = path.join(DIST, 'index.html');
+  const indexHtml = await readFile(indexPath, 'utf8');
+  const busted = indexHtml
+    .replace(/(src|href)="\.\/(app\.js|styles\.css)(\?[^"]*)?"/g, (m, attr, file) => `${attr}="./${file}?v=${stamp}"`);
+  if (busted !== indexHtml) await writeFile(indexPath, busted, 'utf8');
+
   // A tiny marker so an operator can confirm which build is live.
   await writeFile(
     path.join(DIST, 'build-info.json'),
     JSON.stringify({
       product: 'QUIZVERSE',
       built_at: new Date().toISOString(),
+      build: stamp,
       mode: 'static',
       note: 'Static build: game plays fully offline. Teacher accounts, cloud sync and the AI proxy need the Node server.',
     }, null, 2),
@@ -76,8 +87,8 @@ async function main() {
 
   const bytes = await sizeOf(DIST);
   console.log(`Static build ready → ${DIST}`);
-  console.log(`  ${(bytes / 1024).toFixed(0)} KB total · upload this folder to Netlify / Cloudflare Pages / GitHub Pages`);
-  console.log('  Entry: index.html · everything runs offline in the browser');
+  console.log(`  ${(bytes / 1024).toFixed(0)} KB total · build ${stamp} · upload this folder to Netlify / GitHub Pages`);
+  console.log('  Entry: index.html · assets cache-busted · everything runs offline in the browser');
 }
 
 main().catch((err) => {

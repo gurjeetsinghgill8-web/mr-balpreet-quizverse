@@ -668,15 +668,20 @@ export function settings(ctx) {
       <div class="qv-card" style="display:grid;gap:12px">
         <h2 class="qv-h3">🔊 ${esc(t('settings.testSounds'))}</h2>
         <label class="qv-field">
-          <span class="qv-label">${esc(t('settings.volume'))}</span>
+          <span class="qv-label">${esc(t('settings.volume'))} <span id="qv-volume-value" class="qv-small qv-muted">${Math.round((s.volume ?? 1) * 100)}%</span></span>
           <input type="range" id="qv-volume" class="qv-range" min="0" max="100" step="5"
-                 value="${Math.round((s.volume ?? 0.9) * 100)}" aria-label="${esc(t('settings.volume'))}">
+                 value="${Math.round((s.volume ?? 1) * 100)}" aria-label="${esc(t('settings.volume'))}">
         </label>
         <div class="qv-row">
           <button class="qv-btn qv-btn--sm" data-test="intro">▶ ${esc(t('settings.testIntro'))}</button>
           <button class="qv-btn qv-btn--sm" data-test="questionStart">▶ ${esc(t('settings.testQuestion'))}</button>
           <button class="qv-btn qv-btn--sm" data-test="wrong">▶ ${esc(t('settings.testWrong'))}</button>
           <button class="qv-btn qv-btn--sm" data-test="applause">▶ ${esc(t('settings.testApplause'))}</button>
+          <button class="qv-btn qv-btn--sm qv-btn--primary" id="qv-volume-max">${esc(t('settings.volumeMax'))}</button>
+        </div>
+        <div>
+          <div class="qv-row qv-row--between qv-small"><span>${esc(t('settings.outputLevel'))}</span><span id="qv-meter-value" class="qv-muted">—</span></div>
+          <div class="qv-bar" style="height:12px"><div class="qv-bar__fill" id="qv-meter-fill" style="width:0%"></div></div>
         </div>
         <div class="qv-small qv-muted">${esc(t('settings.soundHint'))}</div>
         <hr class="qv-divider">
@@ -726,21 +731,56 @@ export function settings(ctx) {
   $$('input[name="provider"]', ctx.root).forEach((radio) => radio.addEventListener('change', refresh));
   refresh();
 
-  /* ---- classroom speaker: volume + one-tap sound checks ---- */
+  /* ---- classroom speaker: volume, level meter + one-tap sound checks ---- */
   const volumeEl = $('#qv-volume', ctx.root);
-  if (volumeEl) {
-    volumeEl.oninput = () => {
-      const volume = Number(volumeEl.value) / 100;
-      Store.saveSettings({ volume });
-      Sound.apply({ volume, sound: true });
+  const volumeLabel = $('#qv-volume-value', ctx.root);
+  const meterFill = $('#qv-meter-fill', ctx.root);
+  const meterValue = $('#qv-meter-value', ctx.root);
+
+  /** Shows what is actually leaving the speakers, so "is it loud enough?" is visible. */
+  const runMeter = (ms = 1800) => {
+    if (!meterFill) return;
+    const started = Date.now();
+    let highest = 0;
+    const frame = () => {
+      const { peak } = Sound.level();
+      if (peak > highest) highest = peak;
+      meterFill.style.width = `${Math.min(100, Math.round(peak * 100))}%`;
+      meterFill.classList.toggle('is-weak', highest > 0 && highest < 0.5);
+      if (meterValue) meterValue.textContent = `now ${Math.round(peak * 100)}% · peak ${Math.round(highest * 100)}%`;
+      if (Date.now() - started < ms) requestAnimationFrame(frame);
+      else meterFill.style.width = '0%';
     };
+    requestAnimationFrame(frame);
+  };
+
+  const applyVolume = (value) => {
+    const volume = Math.min(1, Math.max(0, Number(value) / 100));
+    Store.saveSettings({ volume });
+    Sound.apply({ volume, sound: true, effects: true });
+    if (volumeLabel) volumeLabel.textContent = `${Math.round(volume * 100)}%`;
+  };
+
+  if (volumeEl) {
+    volumeEl.oninput = () => applyVolume(volumeEl.value);
     volumeEl.onchange = () => Sound.play('select');
+  }
+  const maxButton = $('#qv-volume-max', ctx.root);
+  if (maxButton) {
+    maxButton.onclick = () => {
+      if (volumeEl) volumeEl.value = '100';
+      applyVolume(100);
+      Sound.unlock();
+      Sound.play('intro');
+      runMeter(2200);
+    };
   }
   $$('[data-test]', ctx.root).forEach((btn) => {
     btn.onclick = () => {
       Sound.unlock();
-      Sound.apply({ sound: true, effects: true, volume: Number(volumeEl ? volumeEl.value : 90) / 100 });
+      Sound.apply({ sound: true, effects: true, volume: Number(volumeEl ? volumeEl.value : 100) / 100 });
       Sound.play(btn.dataset.test);
+      runMeter(btn.dataset.test === 'applause' || btn.dataset.test === 'intro' ? 3200 : 1400);
     };
   });
 

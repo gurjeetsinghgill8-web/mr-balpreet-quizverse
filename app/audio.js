@@ -27,9 +27,19 @@ let settings = { ...DEFAULTS };
 let ctx = null;
 let master = null;
 let comp = null;
+let boost = null;
+let analyser = null;
+let levelBuffer = null;
 let fxBus = null;
 let musicBus = null;
 let unlocked = false;
+
+/**
+ * Every source gain is multiplied by this before the limiter. Headroom is free
+ * here: the limiter below keeps peaks just under full scale, so the show is as
+ * loud as the device allows without clipping.
+ */
+const MASTER_TRIM = 2.6;
 
 let musicTimer = null;
 let suspenseTimer = null;
@@ -51,24 +61,39 @@ function ensureCtx() {
   if (!Ctor) return null;
   ctx = new Ctor();
 
-  // A compressor is what makes this audible on a classroom speaker without clipping.
+  /*
+   * A limiter, not a compressor. The earlier settings (threshold −14 dB, ratio 7)
+   * squashed the whole show down to roughly a fifth of full scale, which is why
+   * the game sounded quiet even at maximum device volume. Now peaks are held just
+   * below 0 dBFS and everything below that passes through untouched, so the app
+   * uses the full range the phone or laptop gives us.
+   */
   comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -14;
-  comp.knee.value = 24;
-  comp.ratio.value = 7;
-  comp.attack.value = 0.003;
-  comp.release.value = 0.25;
+  comp.threshold.value = -1.5;
+  comp.knee.value = 0;
+  comp.ratio.value = 20;
+  comp.attack.value = 0.002;
+  comp.release.value = 0.15;
+
+  boost = ctx.createGain();
+  boost.gain.value = 1.15; // small make-up for what the limiter shaves off
+
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  levelBuffer = new Float32Array(analyser.fftSize);
 
   master = ctx.createGain();
   master.gain.value = settings.sound ? settings.volume : 0;
-  master.connect(comp).connect(ctx.destination);
+
+  // sound sources → master → limiter → boost → analyser → speakers
+  master.connect(comp).connect(boost).connect(analyser).connect(ctx.destination);
 
   fxBus = ctx.createGain();
   fxBus.gain.value = settings.effects ? 1 : 0;
   fxBus.connect(master);
 
   musicBus = ctx.createGain();
-  musicBus.gain.value = settings.music ? 0.6 : 0;
+  musicBus.gain.value = settings.music ? 0.9 : 0;
   musicBus.connect(master);
 
   return ctx;
@@ -92,8 +117,9 @@ function tone({
   osc.detune.value = detune;
   osc.frequency.setValueAtTime(freq, start);
   if (to && to !== freq) osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), start + dur);
+  const peak = Math.min(1, Math.max(0.0002, gain * MASTER_TRIM));
   g.gain.setValueAtTime(0.0001, start);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), start + attack);
+  g.gain.exponentialRampToValueAtTime(peak, start + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
   osc.connect(g).connect(bus === 'music' ? musicBus : fxBus);
   osc.start(start);
@@ -120,8 +146,9 @@ function noise({
   if (to !== from) filter.frequency.exponentialRampToValueAtTime(Math.max(40, to), start + dur);
 
   const g = ctx.createGain();
+  const peak = Math.min(1, Math.max(0.0002, gain * MASTER_TRIM));
   g.gain.setValueAtTime(0.0001, start);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), start + attack);
+  g.gain.exponentialRampToValueAtTime(peak, start + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
 
   src.connect(filter).connect(g).connect(bus === 'music' ? musicBus : fxBus);
@@ -167,16 +194,18 @@ const SOUNDS = {
     [1174.66, 1567.98].forEach((f, i) => tone({ freq: f, dur: 0.3, type: 'triangle', gain: 0.16, delay: 0.22 + i * 0.07 }));
   },
 
-  /** Loud clock tick. */
+  /** Loud clock tick — long enough and strong enough to cut through a classroom. */
   tick: () => {
-    tone({ freq: 2200, dur: 0.035, type: 'square', gain: 0.22 });
-    noise({ dur: 0.03, gain: 0.16, from: 3200, to: 3200, q: 2 });
+    tone({ freq: 2100, to: 1500, dur: 0.09, type: 'square', gain: 0.5 });
+    tone({ freq: 1050, dur: 0.07, type: 'triangle', gain: 0.3, delay: 0.005 });
+    noise({ dur: 0.05, gain: 0.45, from: 3000, to: 3000, q: 1.2 });
   },
 
   /** The alternative tick, so the clock sounds like a clock and not a metronome. */
   tock: () => {
-    tone({ freq: 1650, dur: 0.04, type: 'square', gain: 0.2 });
-    noise({ dur: 0.03, gain: 0.13, from: 2400, to: 2400, q: 2 });
+    tone({ freq: 1500, to: 1100, dur: 0.1, type: 'square', gain: 0.46 });
+    tone({ freq: 760, dur: 0.08, type: 'triangle', gain: 0.28, delay: 0.005 });
+    noise({ dur: 0.05, gain: 0.4, from: 2100, to: 2100, q: 1.2 });
   },
 
   correct: () => {
@@ -200,20 +229,21 @@ const SOUNDS = {
 
   /** Synthesised applause: many claps + a crowd bed + a whistle. ~3.4s */
   applause: () => {
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 110; i++) {
       const at = Math.random() * 2.6;
       noise({
-        dur: 0.05 + Math.random() * 0.05,
-        gain: 0.06 + Math.random() * 0.07,
-        from: 1200 + Math.random() * 2400,
-        to: 1800 + Math.random() * 2600,
-        q: 1.6,
+        dur: 0.06 + Math.random() * 0.06,
+        gain: 0.2 + Math.random() * 0.22,
+        from: 900 + Math.random() * 2600,
+        to: 1500 + Math.random() * 3000,
+        q: 0.9,
         delay: at,
       });
     }
-    noise({ dur: 2.8, gain: 0.09, from: 500, to: 1800, q: 0.6, attack: 0.4 }); // crowd bed
-    tone({ freq: 1400, to: 2600, dur: 0.5, type: 'sine', gain: 0.07, delay: 1.1 }); // whistle
-    tone({ freq: 1500, to: 2900, dur: 0.45, type: 'sine', gain: 0.06, delay: 1.9 });
+    noise({ dur: 3, gain: 0.34, from: 400, to: 2200, q: 0.5, attack: 0.3 }); // crowd bed
+    tone({ freq: 1400, to: 2600, dur: 0.5, type: 'sine', gain: 0.22, delay: 1.1 }); // whistle
+    tone({ freq: 1500, to: 2900, dur: 0.45, type: 'sine', gain: 0.2, delay: 1.9 });
+    impact(0.02, 0.3); // the room "opens up"
   },
 
   finalWin: () => {
@@ -230,7 +260,10 @@ const SOUNDS = {
     noise({ dur: 0.3, gain: 0.1, from: 1200, to: 6000, delay: 0.02 });
   },
 
-  whoosh: () => noise({ dur: 0.3, gain: 0.22, from: 180, to: 3600, q: 0.8 }),
+  whoosh: () => {
+    noise({ dur: 0.42, gain: 0.6, from: 150, to: 4200, q: 0.5 });
+    tone({ freq: 140, to: 520, dur: 0.36, type: 'sawtooth', gain: 0.34 });
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -307,9 +340,10 @@ function musicStep() {
   if (!ctx || !settings.music || !settings.sound) return;
   const chord = MUSIC_CHORDS[Math.floor((Date.now() / 2400) % MUSIC_CHORDS.length)];
   // bass + mid arp + a soft pad so the "music" is clearly audible, not just a blip
-  tone({ freq: chord[0] / 2, dur: 1.6, type: 'sine', gain: 0.13, bus: 'music' });
-  tone({ freq: chord[Math.floor(Math.random() * chord.length)] * 2, dur: 0.55, type: 'triangle', gain: 0.09, bus: 'music' });
-  tone({ freq: chord[Math.floor(Math.random() * chord.length)] * 3, dur: 0.4, type: 'sine', gain: 0.06, bus: 'music', delay: 0.3 });
+  tone({ freq: chord[0] / 2, dur: 1.6, type: 'sine', gain: 0.24, bus: 'music' });
+  tone({ freq: chord[Math.floor(Math.random() * chord.length)] * 2, dur: 0.55, type: 'triangle', gain: 0.18, bus: 'music' });
+  tone({ freq: chord[Math.floor(Math.random() * chord.length)] * 3, dur: 0.4, type: 'sine', gain: 0.12, bus: 'music', delay: 0.3 });
+  if (Math.random() < 0.35) tone({ freq: chord[0], dur: 0.7, type: 'triangle', gain: 0.14, bus: 'music', delay: 0.2 });
 }
 
 /* ------------------------------------------------------------------ */
@@ -372,6 +406,45 @@ export const Sound = {
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
   },
 
+  /**
+   * What is actually leaving the speakers right now, measured after the limiter.
+   * peak/rms are 0…1 of full scale — this is how "is it loud enough?" is answered
+   * objectively instead of by guessing.
+   */
+  level() {
+    if (!analyser || !ctx || !levelBuffer) return { peak: 0, rms: 0 };
+    analyser.getFloatTimeDomainData(levelBuffer);
+    let peak = 0;
+    let sum = 0;
+    for (let i = 0; i < levelBuffer.length; i++) {
+      const v = levelBuffer[i];
+      const abs = v < 0 ? -v : v;
+      if (abs > peak) peak = abs;
+      sum += v * v;
+    }
+    return {
+      peak: Math.round(peak * 1000) / 1000,
+      rms: Math.round(Math.sqrt(sum / levelBuffer.length) * 1000) / 1000,
+    };
+  },
+
+  /** Diagnostics for the Settings screen / tests. */
+  diagnostics() {
+    return {
+      available: Boolean(ctx),
+      state: ctx ? ctx.state : 'none',
+      unlocked,
+      sound: settings.sound,
+      effects: settings.effects,
+      music: settings.music,
+      volume: settings.volume,
+      masterGain: master ? master.gain.value : 0,
+      musicGain: musicBus ? musicBus.gain.value : 0,
+      limiterThreshold: comp ? comp.threshold.value : null,
+      sourceTrim: MASTER_TRIM,
+    };
+  },
+
   /** Used by the Settings screen so a teacher can check the classroom speaker. */
   test(name) {
     const wasUnlocked = unlocked;
@@ -385,6 +458,7 @@ export const Sound = {
     stopSuspense();
     if (ctx) { try { ctx.close(); } catch { /* ignore */ } }
     ctx = null; master = null; comp = null; fxBus = null; musicBus = null; unlocked = false;
+    analyser = null; levelBuffer = null; boost = null;
   },
 };
 
